@@ -1,7 +1,5 @@
 import express from "express";
 import {
-  registerUser,
-  loginUser,
   getMe,
   updateMe,
   updateModes,
@@ -13,16 +11,6 @@ import {
 import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
-
-/* ------------------------------------------------------
-   🟢 Inscription
-------------------------------------------------------- */
-router.post("/register", registerUser);
-
-/* ------------------------------------------------------
-   🟢 Connexion
-------------------------------------------------------- */
-router.post("/login", loginUser);
 
 /* ------------------------------------------------------
    🟢 Profil utilisateur

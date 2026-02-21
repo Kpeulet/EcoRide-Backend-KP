@@ -11,61 +11,57 @@ import {
 import RefreshToken from "../models/RefreshToken.js";
 
 /* -------------------------------------------------------
-   🟢 Inscription utilisateur (corrigée + validation complète)
+   🟢 Inscription utilisateur
 ------------------------------------------------------- */
 export const registerUser = async (req, res) => {
   const { username, firstname, lastname, email, password, phone, role } = req.body;
 
   try {
-    // 🔍 Validation complète des champs obligatoires
     if (!username || !firstname || !lastname || !email || !password || !phone) {
-      return res.status(400).json({
-        message: "Tous les champs sont obligatoires.",
-      });
+      return res.status(400).json({ message: "Tous les champs sont obligatoires." });
     }
 
-    // Vérifier email unique
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
       return res.status(400).json({ message: "Cet email est déjà utilisé" });
     }
 
-    // Vérifier username unique
     const existingUsername = await User.findOne({ username });
     if (existingUsername) {
       return res.status(400).json({ message: "Ce pseudo est déjà utilisé" });
     }
 
-    // Rôle autorisé
     const allowedRoles = ["passenger", "driver"];
     const finalRole = allowedRoles.includes(role) ? role : "passenger";
 
-    // Hash du mot de passe AVANT création
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Création utilisateur
-    const newUser = await User.create({
+    // 🔥 IMPORTANT : utiliser new User() + save() pour déclencher le hook pre("save")
+    const newUser = new User({
       username,
       firstname,
       lastname,
       email,
-      password: hashedPassword,
+      password,
       phone,
       credits: 20,
       role: finalRole,
       modes: ["passenger"],
     });
 
-    // Génération du token
-    const token = jwt.sign(
-      { id: newUser._id, role: newUser.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    await newUser.save(); // 🔥 déclenche le hook de hash du mot de passe
+
+    const accessToken = generateAccessToken(newUser);
+    const refreshToken = generateRefreshToken(newUser);
+
+    await RefreshToken.create({
+      user: newUser._id,
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
 
     res.status(201).json({
       message: "Utilisateur créé avec succès",
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: newUser._id,
         username: newUser.username,
@@ -82,38 +78,6 @@ export const registerUser = async (req, res) => {
   }
 };
 
-/* -------------------------------------------------------
-   🟢 US 8 — Mise à jour des modes
-------------------------------------------------------- */
-export const updateModes = async (req, res) => {
-  try {
-    const { modes } = req.body;
-
-    if (!Array.isArray(modes)) {
-      return res.status(400).json({ message: "Format invalide : modes doit être un tableau." });
-    }
-
-    const allowed = ["passenger", "driver"];
-    const validModes = modes.filter((m) => allowed.includes(m));
-
-    if (validModes.length === 0) {
-      return res.status(400).json({ message: "Aucun mode valide fourni." });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { modes: validModes },
-      { new: true }
-    );
-
-    res.json({
-      message: "Modes mis à jour",
-      modes: user.modes,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
-  }
-};
 
 /* -------------------------------------------------------
    🟢 Connexion utilisateur
@@ -173,7 +137,7 @@ export const loginUser = async (req, res) => {
 ------------------------------------------------------- */
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "Utilisateur introuvable" });
@@ -202,6 +166,7 @@ export const updateMe = async (req, res) => {
     const user = await User.findByIdAndUpdate(req.user._id, updates, {
       new: true,
       runValidators: true,
+      select: "-password",
     });
 
     if (!user) {
@@ -215,7 +180,40 @@ export const updateMe = async (req, res) => {
 };
 
 /* -------------------------------------------------------
-   🟢 US 8 — Préférences chauffeur
+   🟢 Mise à jour des modes
+------------------------------------------------------- */
+export const updateModes = async (req, res) => {
+  try {
+    const { modes } = req.body;
+
+    if (!Array.isArray(modes) || modes.length === 0) {
+      return res.status(400).json({ message: "Les modes doivent être un tableau non vide." });
+    }
+
+    const allowed = ["passenger", "driver"];
+    const validModes = modes.filter((m) => allowed.includes(m));
+
+    if (validModes.length === 0) {
+      return res.status(400).json({ message: "Aucun mode valide fourni." });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { modes: validModes },
+      { new: true, select: "-password" }
+    );
+
+    res.json({
+      message: "Modes mis à jour",
+      modes: user.modes,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+};
+
+/* -------------------------------------------------------
+   🟢 Mise à jour des préférences chauffeur
 ------------------------------------------------------- */
 export const updatePreferences = async (req, res) => {
   try {
@@ -230,7 +228,7 @@ export const updatePreferences = async (req, res) => {
           custom: Array.isArray(custom) ? custom : [],
         },
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true, select: "-password" }
     );
 
     res.json({
@@ -243,7 +241,7 @@ export const updatePreferences = async (req, res) => {
 };
 
 /* -------------------------------------------------------
-   🟢 US 8 — Ajouter un véhicule
+   🟢 Ajouter un véhicule
 ------------------------------------------------------- */
 export const addVehicle = async (req, res) => {
   try {
