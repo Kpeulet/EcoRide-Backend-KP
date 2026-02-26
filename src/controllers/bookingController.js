@@ -2,84 +2,80 @@ import Booking from "../models/Booking.js";
 import Ride from "../models/Ride.js";
 
 /* ------------------------------------------------------
-   🟢 Réserver un trajet
+   🎫 Créer une réservation
 ------------------------------------------------------- */
 export const createBooking = async (req, res) => {
   try {
-    const { rideId } = req.body;
+    const { rideId, seatsBooked } = req.body;
 
     if (!rideId) {
       return res.status(400).json({ message: "Le champ rideId est obligatoire." });
     }
 
-    const ride = await Ride.findById(rideId);
+    if (!seatsBooked || seatsBooked <= 0) {
+      return res.status(400).json({ message: "Le nombre de sièges réservés est invalide." });
+    }
 
+    // Vérifier que le trajet existe
+    const ride = await Ride.findById(rideId);
     if (!ride) {
       return res.status(404).json({ message: "Trajet introuvable." });
     }
 
-    if (ride.seats <= 0) {
-      return res.status(400).json({ message: "Plus de places disponibles." });
+    // Vérifier les places disponibles
+    if (ride.availableSeats < seatsBooked) {
+      return res.status(400).json({ message: "Pas assez de places disponibles." });
     }
 
+    // Création de la réservation
     const booking = await Booking.create({
-      user: req.user._id,
       ride: rideId,
+      driver: ride.driver,        // 🔥 IMPORTANT
+      passenger: req.user._id,    // 🔥 IMPORTANT
+      seatsBooked,
+      totalPrice: ride.price * seatsBooked
     });
 
-    ride.seats -= 1;
+    // Mise à jour des places restantes
+    ride.availableSeats -= seatsBooked;
     await ride.save();
 
     res.status(201).json({
-      message: "Réservation effectuée avec succès",
-      booking,
+      message: "Réservation créée avec succès",
+      booking
     });
+
   } catch (error) {
     console.error("Erreur création réservation :", error);
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
 
-/* ------------------------------------------------------
-   📋 Mes réservations
-------------------------------------------------------- */
-export const getMyBookings = async (req, res) => {
-  try {
-    const bookings = await Booking.find({ user: req.user._id })
-      .populate("ride")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      count: bookings.length,
-      bookings,
-    });
-  } catch (error) {
-    console.error("Erreur récupération réservations :", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
-
-/* ------------------------------------------------------
-   ❌ Annuler une réservation
-------------------------------------------------------- */
 export const cancelBooking = async (req, res) => {
   try {
-    const booking = await Booking.findOneAndDelete({
+    const booking = await Booking.findOne({
       _id: req.params.id,
-      user: req.user._id,
-    });
+      passenger: req.user._id
+    }).populate("ride");
 
     if (!booking) {
-      return res.status(404).json({ message: "Réservation introuvable." });
+      return res.status(404).json({ message: "Réservation introuvable ou non autorisée." });
     }
 
-    const ride = await Ride.findById(booking.ride);
-    if (ride) {
-      ride.seats += 1;
-      await ride.save();
+    if (booking.status === "cancelled") {
+      return res.status(400).json({ message: "Cette réservation est déjà annulée." });
     }
 
-    res.json({ message: "Réservation annulée avec succès" });
+    // Annuler la réservation
+    booking.status = "cancelled";
+    await booking.save();
+
+    // Rendre les places au trajet
+    booking.ride.availableSeats += booking.seatsBooked;
+    await booking.ride.save();
+
+    res.json({ message: "Réservation annulée avec succès." });
+
   } catch (error) {
     console.error("Erreur annulation réservation :", error);
     res.status(500).json({ message: "Erreur serveur" });

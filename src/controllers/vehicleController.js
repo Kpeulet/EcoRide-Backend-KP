@@ -5,32 +5,52 @@ import Vehicle from "../models/Vehicle.js";
 ------------------------------------------------------- */
 export const createVehicle = async (req, res) => {
   try {
-    const { brand, model, color, energy, plate, firstRegistration, seats } =
-      req.body;
+    const {
+      brand,
+      model,
+      plate,
+      seats,
+      energy,
+      firstRegistration,
+      color,
+      year
+    } = req.body;
 
-    if (!brand || !model || !plate || !seats) {
+    // Vérification des champs obligatoires
+    if (!brand || !model || !plate || !seats || !energy || !firstRegistration) {
       return res.status(400).json({
-        message: "Les champs brand, model, plate et seats sont obligatoires.",
+        message:
+          "Les champs brand, model, plate, seats, energy et firstRegistration sont obligatoires."
       });
     }
 
+    // Création du véhicule
     const vehicle = await Vehicle.create({
       owner: req.user._id,
       brand,
       model,
-      color,
-      energy,
       plate,
-      firstRegistration,
       seats,
+      energy,
+      firstRegistration,
+      color,
+      year
     });
 
     res.status(201).json({
       message: "Véhicule ajouté avec succès",
-      vehicle,
+      vehicle
     });
   } catch (error) {
     console.error("Erreur ajout véhicule :", error);
+
+    // Gestion de l’erreur de doublon (plaque unique)
+    if (error.code === 11000 && error.keyPattern?.plate) {
+      return res.status(400).json({
+        message: "Cette plaque est déjà enregistrée."
+      });
+    }
+
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
@@ -41,11 +61,7 @@ export const createVehicle = async (req, res) => {
 export const getMyVehicles = async (req, res) => {
   try {
     const vehicles = await Vehicle.find({ owner: req.user._id });
-
-    res.json({
-      count: vehicles.length,
-      vehicles,
-    });
+    res.json(vehicles);
   } catch (error) {
     console.error("Erreur récupération véhicules :", error);
     res.status(500).json({ message: "Erreur serveur" });
@@ -59,11 +75,13 @@ export const getVehicleById = async (req, res) => {
   try {
     const vehicle = await Vehicle.findOne({
       _id: req.params.id,
-      owner: req.user._id,
+      owner: req.user._id
     });
 
     if (!vehicle) {
-      return res.status(404).json({ message: "Véhicule introuvable." });
+      return res.status(404).json({
+        message: "Véhicule introuvable ou non autorisé."
+      });
     }
 
     res.json(vehicle);
@@ -78,22 +96,33 @@ export const getVehicleById = async (req, res) => {
 ------------------------------------------------------- */
 export const updateVehicle = async (req, res) => {
   try {
-    const vehicle = await Vehicle.findOneAndUpdate(
-      { _id: req.params.id, owner: req.user._id },
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const vehicle = await Vehicle.findOne({
+      _id: req.params.id,
+      owner: req.user._id
+    });
 
     if (!vehicle) {
-      return res.status(404).json({ message: "Véhicule introuvable." });
+      return res.status(404).json({
+        message: "Véhicule introuvable ou non autorisé."
+      });
     }
 
+    Object.assign(vehicle, req.body);
+    await vehicle.save();
+
     res.json({
-      message: "Véhicule mis à jour",
-      vehicle,
+      message: "Véhicule mis à jour avec succès",
+      vehicle
     });
   } catch (error) {
     console.error("Erreur mise à jour véhicule :", error);
+
+    if (error.code === 11000 && error.keyPattern?.plate) {
+      return res.status(400).json({
+        message: "Cette plaque est déjà enregistrée."
+      });
+    }
+
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
@@ -105,11 +134,13 @@ export const deleteVehicle = async (req, res) => {
   try {
     const vehicle = await Vehicle.findOneAndDelete({
       _id: req.params.id,
-      owner: req.user._id,
+      owner: req.user._id
     });
 
     if (!vehicle) {
-      return res.status(404).json({ message: "Véhicule introuvable." });
+      return res.status(404).json({
+        message: "Véhicule introuvable ou non autorisé."
+      });
     }
 
     res.json({ message: "Véhicule supprimé avec succès" });

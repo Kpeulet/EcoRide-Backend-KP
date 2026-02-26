@@ -1,34 +1,11 @@
 import express from "express";
-import {
-  registerUser,
-  loginUser,
-} from "../controllers/userController.js";
-
-import {
-  refreshAccessToken,
-  logoutUser,
-} from "../controllers/authController.js";
+import { register, login, getMe } from "../controllers/authController.js";
+import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-/* ------------------------------------------------------
-   🟢 Inscription
-------------------------------------------------------- */
-router.post("/register", registerUser);
-
-/* ------------------------------------------------------
-   🟢 Connexion
-------------------------------------------------------- */
-router.post("/login", loginUser);
-
-/* ------------------------------------------------------
-   🔄 Rafraîchir l'access token
-------------------------------------------------------- */
-router.post("/refresh", refreshAccessToken);
-
-/* ------------------------------------------------------
-   🚪 Déconnexion utilisateur
-------------------------------------------------------- */
-router.post("/logout", logoutUser);
+router.post("/register", register);
+router.post("/login", login);
+router.get("/me", protect, getMe);
 
 export default router;

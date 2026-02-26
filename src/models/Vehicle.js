@@ -14,7 +14,7 @@ const vehicleSchema = new mongoose.Schema(
 
     energy: {
       type: String,
-      enum: ["essence", "diesel", "electrique", "hybride"],
+      enum: ["diesel", "petrol", "hybrid", "electric"],
       required: true,
     },
 
@@ -22,7 +22,6 @@ const vehicleSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      trim: true,
     },
 
     firstRegistration: {

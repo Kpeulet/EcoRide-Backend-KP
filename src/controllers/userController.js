@@ -13,7 +13,7 @@ import RefreshToken from "../models/RefreshToken.js";
 /* -------------------------------------------------------
    🟢 Inscription utilisateur
 ------------------------------------------------------- */
-export const registerUser = async (req, res) => {
+export const registerUser = async (req, res, next) => {
   const { username, firstname, lastname, email, password, phone, role } = req.body;
 
   try {
@@ -34,7 +34,6 @@ export const registerUser = async (req, res) => {
     const allowedRoles = ["passenger", "driver"];
     const finalRole = allowedRoles.includes(role) ? role : "passenger";
 
-    // 🔥 IMPORTANT : utiliser new User() + save() pour déclencher le hook pre("save")
     const newUser = new User({
       username,
       firstname,
@@ -47,7 +46,7 @@ export const registerUser = async (req, res) => {
       modes: ["passenger"],
     });
 
-    await newUser.save(); // 🔥 déclenche le hook de hash du mot de passe
+    await newUser.save();
 
     const accessToken = generateAccessToken(newUser);
     const refreshToken = generateRefreshToken(newUser);
@@ -74,7 +73,7 @@ export const registerUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
@@ -82,7 +81,7 @@ export const registerUser = async (req, res) => {
 /* -------------------------------------------------------
    🟢 Connexion utilisateur
 ------------------------------------------------------- */
-export const loginUser = async (req, res) => {
+export const loginUser = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
@@ -128,14 +127,14 @@ export const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Voir son profil
 ------------------------------------------------------- */
-export const getMe = async (req, res) => {
+export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
 
@@ -145,14 +144,14 @@ export const getMe = async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Mettre à jour son profil
 ------------------------------------------------------- */
-export const updateMe = async (req, res) => {
+export const updateMe = async (req, res, next) => {
   try {
     const allowedFields = ["firstname", "lastname", "email", "phone"];
     const updates = {};
@@ -175,14 +174,14 @@ export const updateMe = async (req, res) => {
 
     res.json({ message: "Profil mis à jour", user });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Mise à jour des modes
 ------------------------------------------------------- */
-export const updateModes = async (req, res) => {
+export const updateModes = async (req, res, next) => {
   try {
     const { modes } = req.body;
 
@@ -208,14 +207,14 @@ export const updateModes = async (req, res) => {
       modes: user.modes,
     });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Mise à jour des préférences chauffeur
 ------------------------------------------------------- */
-export const updatePreferences = async (req, res) => {
+export const updatePreferences = async (req, res, next) => {
   try {
     const { smoker, animals, custom } = req.body;
 
@@ -236,14 +235,14 @@ export const updatePreferences = async (req, res) => {
       preferences: user.preferences,
     });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Ajouter un véhicule
 ------------------------------------------------------- */
-export const addVehicle = async (req, res) => {
+export const addVehicle = async (req, res, next) => {
   try {
     const { brand, model, color, energy, plate, firstRegistration, seats } =
       req.body;
@@ -264,18 +263,18 @@ export const addVehicle = async (req, res) => {
       vehicle,
     });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };
 
 /* -------------------------------------------------------
    🟢 Supprimer son compte
 ------------------------------------------------------- */
-export const deleteMe = async (req, res) => {
+export const deleteMe = async (req, res, next) => {
   try {
     await User.findByIdAndDelete(req.user._id);
     res.json({ message: "Compte supprimé avec succès" });
   } catch (error) {
-    res.status(500).json({ message: "Erreur serveur", error: error.message });
+    next(error);
   }
 };

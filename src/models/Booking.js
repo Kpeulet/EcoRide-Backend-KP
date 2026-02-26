@@ -1,5 +1,5 @@
 /* ------------------------------------------------------
-   📦 Booking Model (version professionnelle)
+   📦 Booking Model (version professionnelle et corrigée)
 ------------------------------------------------------- */
 
 import mongoose from "mongoose";
@@ -32,7 +32,8 @@ const bookingSchema = new mongoose.Schema(
       min: 1
     },
 
-    price: {
+    // 🔥 Correction majeure : totalPrice remplace price
+    totalPrice: {
       type: Number,
       required: true,
       min: 0

@@ -57,3 +57,49 @@ export const getRideStats = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
+
+/* ------------------------------------------------------
+   📊 Crédits gagnés par jour
+------------------------------------------------------- */
+export const getCreditsPerDay = async (req, res) => {
+  try {
+    const creditsPerDay = await Booking.aggregate([
+      { $match: { paymentStatus: "paid" } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$bookedAt" },
+            month: { $month: "$bookedAt" },
+            day: { $dayOfMonth: "$bookedAt" }
+          },
+          totalCredits: { $sum: "$price" }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } }
+    ]);
+
+    res.json(creditsPerDay);
+  } catch (error) {
+    console.error("Erreur stats crédits par jour :", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+};
+
+/* ------------------------------------------------------
+   💰 Total des crédits gagnés
+------------------------------------------------------- */
+export const getCreditsTotal = async (req, res) => {
+  try {
+    const result = await Booking.aggregate([
+      { $match: { paymentStatus: "paid" } },
+      { $group: { _id: null, totalCredits: { $sum: "$price" } } }
+    ]);
+
+    const total = result.length > 0 ? result[0].totalCredits : 0;
+
+    res.json({ totalCredits: total });
+  } catch (error) {
+    console.error("Erreur total crédits :", error);
+    res.status(500).json({ message: "Erreur serveur" });
+  }
+};

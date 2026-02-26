@@ -1,92 +1,63 @@
+console.log(">>> User.js chargé depuis :", import.meta.url);
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    username: {
-      type: String,
-      required: [true, "Le nom d'utilisateur est obligatoire"],
-      unique: true,
-      trim: true,
-    },
+    username: { type: String, required: true, unique: true },
+    firstname: { type: String, required: true },
+    lastname: { type: String, required: true },
 
-    firstname: {
-      type: String,
-      required: [true, "Le prénom est obligatoire"],
-    },
-
-    lastname: {
-      type: String,
-      required: [true, "Le nom est obligatoire"],
-    },
-
-    email: {
-      type: String,
-      required: [true, "L'email est obligatoire"],
-      unique: true,
-      lowercase: true,
-    },
-
-    password: {
-      type: String,
-      required: [true, "Le mot de passe est obligatoire"],
-      minlength: 6,
-      select: false,
-    },
-
-    phone: {
-      type: String,
-      required: [true, "Le numéro de téléphone est obligatoire"],
-    },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
 
     role: {
-      type: String,
-      enum: ["admin", "employee", "driver", "passenger"],
-      default: "passenger",
-    },
+  type: String,
+  enum: ["user", "admin", "employee"], // ✔️ Ajout de employee
+  default: "user"
+},
 
-    modes: {
-      type: [String],
-      enum: ["passenger", "driver"],
-      default: ["passenger"],
-    },
-
-    preferences: {
-      smoker: { type: Boolean, default: false },
-      animals: { type: Boolean, default: false },
-      custom: { type: [String], default: [] },
-    },
+    phone: { type: String },
 
     credits: {
       type: Number,
-      default: 20,
+      default: 0,
     },
 
-    isActive: {
-      type: Boolean,
-      default: true,
+    photo: { type: String },
+
+    driverRating: {
+      type: Number,
+      default: 0,
     },
 
-    isSuspended: {
-      type: Boolean,
-      default: false,
+    driverReviewsCount: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true }
 );
 
-/* ------------------------------------------------------
-   🔐 Hash du mot de passe AVANT sauvegarde
+/* -------------------------------------------------------
+   🔐 Hash du mot de passe avant sauvegarde
 ------------------------------------------------------- */
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  try {
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-  } catch (error) {
-    next(error);
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) {
+    return;
   }
+
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
-export default mongoose.model("User", userSchema);
+/* -------------------------------------------------------
+   🔐 Méthode pour comparer les mots de passe
+------------------------------------------------------- */
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return bcrypt.compare(enteredPassword, this.password);
+};
+
+const User = mongoose.model("User", userSchema);
+export default User;

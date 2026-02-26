@@ -1,24 +1,41 @@
 import Ride from "../models/Ride.js";
+import Vehicle from "../models/Vehicle.js";
 
-/* ------------------------------------------------------
-   🚗 Créer un trajet
+/* -------------------------------------------------------
+   🟢 Créer un trajet (utilisateur connecté)
 ------------------------------------------------------- */
-export const createRide = async (req, res) => {
+export const createRide = async (req, res, next) => {
   try {
-    const { from, to, date, seats, price } = req.body;
+    const {
+      departureCity,
+      arrivalCity,
+      date,
+      time,
+      availableSeats,
+      price,
+      vehicleId,
+    } = req.body;
 
-    if (!from || !to || !date || !seats) {
+    // Vérifier que le véhicule appartient bien à l'utilisateur
+    const vehicle = await Vehicle.findOne({
+      _id: vehicleId,
+      owner: req.user._id,
+    });
+
+    if (!vehicle) {
       return res.status(400).json({
-        message: "Les champs from, to, date et seats sont obligatoires.",
+        message: "Véhicule introuvable ou non associé à cet utilisateur.",
       });
     }
 
     const ride = await Ride.create({
       driver: req.user._id,
-      from,
-      to,
+      vehicle: vehicleId,
+      departureCity,
+      arrivalCity,
       date,
-      seats,
+      time,
+      availableSeats,
       price,
     });
 
@@ -27,94 +44,72 @@ export const createRide = async (req, res) => {
       ride,
     });
   } catch (error) {
-    console.error("Erreur création trajet :", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    next(error);
   }
 };
 
-/* ------------------------------------------------------
-   🚗 Trajets disponibles
+/* -------------------------------------------------------
+   🟢 Rechercher des trajets (visiteur)
 ------------------------------------------------------- */
-export const getAvailableRides = async (req, res) => {
+export const searchRides = async (req, res, next) => {
   try {
-    const rides = await Ride.find({ status: "open" }).populate(
-      "driver",
-      "username email"
-    );
+    const { from, to, date } = req.query;
 
-    res.json({
-      count: rides.length,
-      rides,
-    });
-  } catch (error) {
-    console.error("Erreur récupération trajets :", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
-
-/* ------------------------------------------------------
-   🚗 Détails d’un trajet
-------------------------------------------------------- */
-export const getRideById = async (req, res) => {
-  try {
-    const ride = await Ride.findById(req.params.id).populate(
-      "driver",
-      "username email"
-    );
-
-    if (!ride) {
-      return res.status(404).json({ message: "Trajet introuvable." });
+    if (!from || !to || !date) {
+      return res.status(400).json({
+        message: "Les champs from, to et date sont obligatoires.",
+      });
     }
 
-    res.json(ride);
-  } catch (error) {
-    console.error("Erreur récupération trajet :", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
+    // Recherche des trajets correspondant exactement à la date
+    const rides = await Ride.find({
+      departureCity: from,
+      arrivalCity: to,
+      date,
+      availableSeats: { $gte: 1 },
+    })
+      .populate("driver", "username photo driverRating driverReviewsCount")
+      .populate("vehicle", "energy");
 
-/* ------------------------------------------------------
-   🚗 Modifier un trajet
-------------------------------------------------------- */
-export const updateRide = async (req, res) => {
-  try {
-    const ride = await Ride.findOneAndUpdate(
-      { _id: req.params.id, driver: req.user._id },
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!ride) {
-      return res.status(404).json({ message: "Trajet introuvable." });
+    // Si des trajets existent → on les renvoie
+    if (rides.length > 0) {
+      return res.json({
+        rides: rides.map((r) => ({
+          id: r._id,
+          driver: r.driver,
+          departureCity: r.departureCity,
+          arrivalCity: r.arrivalCity,
+          date: r.date,
+          time: r.time,
+          availableSeats: r.availableSeats,
+          price: r.price,
+          isEco: r.vehicle.energy === "electric",
+        })),
+      });
     }
 
-    res.json({
-      message: "Trajet mis à jour",
-      ride,
-    });
-  } catch (error) {
-    console.error("Erreur mise à jour trajet :", error);
-    res.status(500).json({ message: "Erreur serveur" });
-  }
-};
+    // Sinon → on cherche la date la plus proche après celle demandée
+    const nextRide = await Ride.find({
+      departureCity: from,
+      arrivalCity: to,
+      availableSeats: { $gte: 1 },
+      date: { $gt: date },
+    })
+      .sort({ date: 1 })
+      .limit(1);
 
-/* ------------------------------------------------------
-   🚗 Supprimer un trajet
-------------------------------------------------------- */
-export const deleteRide = async (req, res) => {
-  try {
-    const ride = await Ride.findOneAndDelete({
-      _id: req.params.id,
-      driver: req.user._id,
-    });
-
-    if (!ride) {
-      return res.status(404).json({ message: "Trajet introuvable." });
+    if (nextRide.length === 0) {
+      return res.json({
+        rides: [],
+        suggestedDate: null,
+      });
     }
 
-    res.json({ message: "Trajet supprimé avec succès" });
+    return res.json({
+      rides: [],
+      suggestedDate: nextRide[0].date,
+    });
   } catch (error) {
-    console.error("Erreur suppression trajet :", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    next(error);
   }
 };
