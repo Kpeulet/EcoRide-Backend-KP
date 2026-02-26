@@ -11,7 +11,7 @@ import Booking from "../models/Booking.js";
 ------------------------------------------------------- */
 export const createEmployee = async (req, res) => {
   try {
-    const { firstname, lastname, email, password, phone } = req.body;
+    const { username, firstname, lastname, email, password, phone } = req.body;
 
     // Vérifier si l'email existe déjà
     const existing = await User.findOne({ email });
@@ -19,8 +19,15 @@ export const createEmployee = async (req, res) => {
       return res.status(400).json({ message: "Cet email est déjà utilisé." });
     }
 
+    // Vérifier si le username existe déjà
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({ message: "Ce nom d'utilisateur est déjà utilisé." });
+    }
+
     // Création de l'employé
     const employee = await User.create({
+      username,
       firstname,
       lastname,
       email,
@@ -182,4 +189,3 @@ export const getRevenuePerDay = async (req, res) => {
     res.status(500).json({ message: "Erreur serveur" });
   }
 };
-
