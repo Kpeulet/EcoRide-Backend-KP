@@ -5,30 +5,62 @@ const rideSchema = new mongoose.Schema(
     driver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: true
     },
 
     vehicle: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vehicle",
-      required: true,
+      required: true
     },
 
-    departureCity: { type: String, required: true },
-    arrivalCity: { type: String, required: true },
+    departureCity: {
+      type: String,
+      required: true
+    },
 
-    date: { type: String, required: true }, // YYYY-MM-DD
-    time: { type: String, required: true }, // HH:mm
+    arrivalCity: {
+      type: String,
+      required: true
+    },
 
-    availableSeats: { type: Number, required: true, min: 1 },
-    price: { type: Number, required: true, min: 0 },
+    date: {
+      type: String, // format YYYY-MM-DD
+      required: true
+    },
+
+    time: {
+      type: String, // format HH:mm
+      required: true
+    },
+
+    availableSeats: {
+      type: Number,
+      required: true,
+      min: 1
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    // 🆕 Durée du trajet (en minutes) — nécessaire pour l’US 4
+    duration: {
+      type: Number,
+      required: true,
+      min: 1
+    },
+
+    isEco: { type: Boolean, default: false },
 
     passengers: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
+        ref: "User"
+      }
+    ]
   },
   { timestamps: true }
 );

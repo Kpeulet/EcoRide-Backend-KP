@@ -1,20 +1,29 @@
 import express from "express";
-import { protect } from "../middlewares/auth.js";
 import {
-  createRide,
   searchRides,
+  createRide,
+  bookRide
 } from "../controllers/rideController.js";
+import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-/* ------------------------------------------------------
-   🔍 Recherche de trajets (visiteur)
-------------------------------------------------------- */
+/* ============================================================
+   🟦 US 3 + US 4 : Recherche de trajets (VISITEUR)
+   - Accessible sans authentification
+============================================================ */
 router.get("/search", searchRides);
 
-/* ------------------------------------------------------
-   🚗 Création d’un trajet (utilisateur connecté)
-------------------------------------------------------- */
+/* ============================================================
+   🟩 US 5 : Création d’un trajet (DRIVER)
+   - Authentification obligatoire
+============================================================ */
 router.post("/", protect, createRide);
+
+/* ============================================================
+   🟧 US 5 : Réservation d’un trajet (PASSAGER)
+   - Authentification obligatoire
+============================================================ */
+router.post("/:rideId/book", protect, bookRide);
 
 export default router;
