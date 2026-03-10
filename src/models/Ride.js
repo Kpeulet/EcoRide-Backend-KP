@@ -14,55 +14,61 @@ const rideSchema = new mongoose.Schema(
       required: true
     },
 
-    departureCity: {
+    startAddress: {
       type: String,
       required: true
     },
 
-    arrivalCity: {
+    endAddress: {
       type: String,
       required: true
-    },
-
-    date: {
-      type: String, // format YYYY-MM-DD
-      required: true
-    },
-
-    time: {
-      type: String, // format HH:mm
-      required: true
-    },
-
-    availableSeats: {
-      type: Number,
-      required: true,
-      min: 1
     },
 
     price: {
       type: Number,
-      required: true,
-      min: 0
+      required: true
     },
 
-    // 🆕 Durée du trajet (en minutes) — nécessaire pour l’US 4
-    duration: {
+    finalPrice: {
       type: Number,
-      required: true,
-      min: 1
+      required: true
     },
-
-    isEco: { type: Boolean, default: false },
 
     passengers: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
       }
+    ],
+
+    // 🆕 US11 — Statut du trajet
+    status: {
+      type: String,
+      enum: ["scheduled", "in_progress", "completed", "cancelled"],
+      default: "scheduled"
+    },
+
+    // 🆕 US11 — Validation des passagers après trajet
+    passengerValidations: [
+      {
+        passenger: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true
+        },
+        status: {
+          type: String,
+          enum: ["pending", "ok", "issue"],
+          default: "pending"
+        },
+        comment: String
+      }
     ]
   },
-  { timestamps: true }
+  {
+    timestamps: true
+  }
 );
+
 
 export default mongoose.model("Ride", rideSchema);

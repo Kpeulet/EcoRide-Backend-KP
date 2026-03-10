@@ -12,30 +12,53 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
 
+    // 🆕 Type d'utilisateur selon Studi (chauffeur / passager / les deux)
+    userType: {
+      type: String,
+      enum: ["passenger", "driver", "both"],
+      default: "passenger"
+    },
+
+    // 🆕 Véhicules du chauffeur (US 8)
+    vehicles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Vehicle"
+      }
+    ],
+
+    // 🆕 Préférences conducteur (US 8)
+    preferences: {
+      smoker: { type: Boolean, default: false },
+      animals: { type: Boolean, default: false },
+      custom: { type: String, default: "" }
+    },
+
+    // Rôle interne
     role: {
-  type: String,
-  enum: ["user", "admin", "employee"], // ✔️ Ajout de employee
-  default: "user"
-},
+      type: String,
+      enum: ["user", "admin", "employee"],
+      default: "user"
+    },
 
     phone: { type: String },
 
     credits: {
       type: Number,
-      default: 0,
+      default: 20
     },
 
     photo: { type: String },
 
     driverRating: {
       type: Number,
-      default: 0,
+      default: 0
     },
 
     driverReviewsCount: {
       type: Number,
-      default: 0,
-    },
+      default: 0
+    }
   },
   { timestamps: true }
 );

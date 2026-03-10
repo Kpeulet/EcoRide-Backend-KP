@@ -1,37 +1,41 @@
 import express from "express";
-import {
-  getMe,
-  updateMe,
-  updateModes,
-  updatePreferences,
-  addVehicle,
-  deleteMe,
-} from "../controllers/userController.js";
-
 import { protect } from "../middlewares/auth.js";
+import {
+  getMyProfile,
+  updateUserType,
+  addVehicle,
+  updatePreferences,
+  getRideHistory
+} from "../controllers/userController.js";
+import { addCredits } from "../controllers/userController.js";
 
 const router = express.Router();
 
-/* ------------------------------------------------------
-   🟢 Profil utilisateur
-------------------------------------------------------- */
-router.get("/me", protect, getMe);
-router.patch("/me", protect, updateMe);
-router.delete("/me", protect, deleteMe);
+/* ============================================================
+   👤 Profil utilisateur
+============================================================ */
+router.get("/me", protect, getMyProfile);
 
-/* ------------------------------------------------------
-   🟢 Modes d'utilisation
-------------------------------------------------------- */
-router.patch("/modes", protect, updateModes);
+/* ============================================================
+   🟦 Type d'utilisateur (chauffeur / passager)
+============================================================ */
+router.patch("/me/type", protect, updateUserType);
 
-/* ------------------------------------------------------
-   🟢 Préférences chauffeur
-------------------------------------------------------- */
-router.patch("/preferences", protect, updatePreferences);
+/* ============================================================
+   🚗 Gestion des véhicules
+============================================================ */
+router.post("/me/vehicles", protect, addVehicle);
 
-/* ------------------------------------------------------
-   🟢 Ajouter un véhicule
-------------------------------------------------------- */
-router.post("/vehicle", protect, addVehicle);
+/* ============================================================
+   ⚙️ Préférences chauffeur
+============================================================ */
+router.patch("/me/preferences", protect, updatePreferences);
+
+/* ============================================================
+   📜 Historique des trajets (US 10)
+============================================================ */
+router.get("/me/history", protect, getRideHistory);
+
+router.patch("/me/credits", protect, addCredits);
 
 export default router;

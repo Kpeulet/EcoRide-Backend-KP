@@ -1,280 +1,185 @@
 import User from "../models/User.js";
 import Vehicle from "../models/Vehicle.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import Ride from "../models/Ride.js";
+import sendEmail from "../services/sendEmail.js"; // si tu as un utilitaire d’envoi d’email
 
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../services/authService.js";
-
-import RefreshToken from "../models/RefreshToken.js";
-
-/* -------------------------------------------------------
-   🟢 Inscription utilisateur
-------------------------------------------------------- */
-export const registerUser = async (req, res, next) => {
-  const { username, firstname, lastname, email, password, phone, role } = req.body;
-
+/* ============================================================
+   👤 GET /users/me : profil complet
+============================================================ */
+export const getMyProfile = async (req, res) => {
   try {
-    if (!username || !firstname || !lastname || !email || !password || !phone) {
-      return res.status(400).json({ message: "Tous les champs sont obligatoires." });
-    }
-
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(400).json({ message: "Cet email est déjà utilisé" });
-    }
-
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({ message: "Ce pseudo est déjà utilisé" });
-    }
-
-    const allowedRoles = ["passenger", "driver"];
-    const finalRole = allowedRoles.includes(role) ? role : "passenger";
-
-    const newUser = new User({
-      username,
-      firstname,
-      lastname,
-      email,
-      password,
-      phone,
-      credits: 20,
-      role: finalRole,
-      modes: ["passenger"],
-    });
-
-    await newUser.save();
-
-    const accessToken = generateAccessToken(newUser);
-    const refreshToken = generateRefreshToken(newUser);
-
-    await RefreshToken.create({
-      user: newUser._id,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
-    res.status(201).json({
-      message: "Utilisateur créé avec succès",
-      accessToken,
-      refreshToken,
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        firstname: newUser.firstname,
-        lastname: newUser.lastname,
-        email: newUser.email,
-        role: newUser.role,
-        phone: newUser.phone,
-        credits: newUser.credits,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-/* -------------------------------------------------------
-   🟢 Connexion utilisateur
-------------------------------------------------------- */
-export const loginUser = async (req, res, next) => {
-  const { email, password } = req.body;
-
-  try {
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findById(req.user._id)
+      .select("-password")
+      .populate("vehicles");
 
     if (!user) {
-      return res.status(400).json({ message: "Email ou mot de passe incorrect" });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ message: "Ce compte est désactivé" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Email ou mot de passe incorrect" });
-    }
-
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-
-    await RefreshToken.create({
-      user: user._id,
-      token: refreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
-    res.json({
-      message: "Connexion réussie",
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id,
-        username: user.username,
-        firstname: user.firstname,
-        lastname: user.lastname,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        credits: user.credits,
-        driverRating: user.driverRating,
-        driverReviewsCount: user.driverReviewsCount,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/* -------------------------------------------------------
-   🟢 Voir son profil
-------------------------------------------------------- */
-export const getMe = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({ message: "Utilisateur introuvable" });
+      return res.status(404).json({ message: "Utilisateur introuvable." });
     }
 
     res.json(user);
   } catch (error) {
-    next(error);
+    console.error("Erreur getMyProfile :", error);
+    res.status(500).json({ message: "Erreur serveur." });
   }
 };
 
-/* -------------------------------------------------------
-   🟢 Mettre à jour son profil
-------------------------------------------------------- */
-export const updateMe = async (req, res, next) => {
+/* ============================================================
+   🟦 PATCH /users/me/type : changer le type d'utilisateur
+============================================================ */
+export const updateUserType = async (req, res) => {
   try {
-    const allowedFields = ["firstname", "lastname", "email", "phone"];
-    const updates = {};
+    const { userType } = req.body;
 
-    for (const key of allowedFields) {
-      if (req.body[key] !== undefined) {
-        updates[key] = req.body[key];
-      }
+    if (!["passenger", "driver", "both"].includes(userType)) {
+      return res.status(400).json({
+        message: "Type d'utilisateur invalide. Valeurs possibles : passenger, driver, both."
+      });
     }
 
-    const user = await User.findByIdAndUpdate(req.user._id, updates, {
-      new: true,
-      runValidators: true,
-      select: "-password",
-    });
+    const user = await User.findById(req.user._id).populate("vehicles");
 
     if (!user) {
-      return res.status(404).json({ message: "Utilisateur introuvable" });
+      return res.status(404).json({ message: "Utilisateur introuvable." });
     }
 
-    res.json({ message: "Profil mis à jour", user });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/* -------------------------------------------------------
-   🟢 Mise à jour des modes
-------------------------------------------------------- */
-export const updateModes = async (req, res, next) => {
-  try {
-    const { modes } = req.body;
-
-    if (!Array.isArray(modes) || modes.length === 0) {
-      return res.status(400).json({ message: "Les modes doivent être un tableau non vide." });
+    if ((userType === "driver" || userType === "both") && user.vehicles.length === 0) {
+      return res.status(400).json({
+        message: "Vous devez ajouter au moins un véhicule avant de devenir chauffeur."
+      });
     }
 
-    const allowed = ["passenger", "driver"];
-    const validModes = modes.filter((m) => allowed.includes(m));
-
-    if (validModes.length === 0) {
-      return res.status(400).json({ message: "Aucun mode valide fourni." });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { modes: validModes },
-      { new: true, select: "-password" }
-    );
+    user.userType = userType;
+    await user.save();
 
     res.json({
-      message: "Modes mis à jour",
-      modes: user.modes,
+      message: "Type d'utilisateur mis à jour avec succès.",
+      userType: user.userType
     });
   } catch (error) {
-    next(error);
+    console.error("Erreur updateUserType :", error);
+    res.status(500).json({ message: "Erreur serveur." });
   }
 };
 
-/* -------------------------------------------------------
-   🟢 Mise à jour des préférences chauffeur
-------------------------------------------------------- */
-export const updatePreferences = async (req, res, next) => {
+/* ============================================================
+   🚗 POST /users/me/vehicles : ajouter un véhicule
+============================================================ */
+export const addVehicle = async (req, res) => {
   try {
-    const { smoker, animals, custom } = req.body;
+    const {
+      brand,
+      model,
+      color,
+      plate,
+      firstRegistration,
+      seats,
+      energy
+    } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      {
-        preferences: {
-          smoker: smoker ?? false,
-          animals: animals ?? false,
-          custom: Array.isArray(custom) ? custom : [],
-        },
-      },
-      { new: true, runValidators: true, select: "-password" }
-    );
-
-    res.json({
-      message: "Préférences mises à jour",
-      preferences: user.preferences,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/* -------------------------------------------------------
-   🟢 Ajouter un véhicule
-------------------------------------------------------- */
-export const addVehicle = async (req, res, next) => {
-  try {
-    const { brand, model, color, energy, plate, firstRegistration, seats } =
-      req.body;
+    if (!brand || !model || !color || !plate || !firstRegistration || !seats) {
+      return res.status(400).json({
+        message: "Tous les champs véhicule sont obligatoires."
+      });
+    }
 
     const vehicle = await Vehicle.create({
       owner: req.user._id,
       brand,
       model,
       color,
-      energy,
       plate,
       firstRegistration,
       seats,
+      energy
     });
 
+    const user = await User.findById(req.user._id);
+    user.vehicles.push(vehicle._id);
+    await user.save();
+
     res.status(201).json({
-      message: "Véhicule ajouté",
-      vehicle,
+      message: "Véhicule ajouté avec succès.",
+      vehicle
     });
   } catch (error) {
-    next(error);
+    console.error("Erreur addVehicle :", error);
+    res.status(500).json({ message: "Erreur serveur." });
   }
 };
 
-/* -------------------------------------------------------
-   🟢 Supprimer son compte
-------------------------------------------------------- */
-export const deleteMe = async (req, res, next) => {
+/* ============================================================
+   ⚙️ PATCH /users/me/preferences : préférences conducteur
+============================================================ */
+export const updatePreferences = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.user._id);
-    res.json({ message: "Compte supprimé avec succès" });
+    const { smoker, animals, custom } = req.body;
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+
+    if (typeof smoker !== "undefined") user.preferences.smoker = Boolean(smoker);
+    if (typeof animals !== "undefined") user.preferences.animals = Boolean(animals);
+    if (typeof custom !== "undefined") user.preferences.custom = custom;
+
+    await user.save();
+
+    res.json({
+      message: "Préférences mises à jour avec succès.",
+      preferences: user.preferences
+    });
   } catch (error) {
-    next(error);
+    console.error("Erreur updatePreferences :", error);
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+/* ============================================================
+   📜 GET /users/me/history : historique des trajets
+============================================================ */
+export const getRideHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const rides = await Ride.find({
+      $or: [
+        { driver: userId },
+        { passengers: userId }
+      ]
+    })
+      .populate("driver", "-password")
+      .populate("vehicle")
+      .sort({ createdAt: -1 });
+
+    res.json(rides);
+  } catch (error) {
+    console.error("Erreur getRideHistory :", error);
+    res.status(500).json({ message: "Erreur serveur." });
+  }
+};
+
+/* ============================================================
+   💰 Ajouter des crédits au compte utilisateur
+============================================================ */
+export const addCredits = async (req, res) => {
+  try {
+    const user = req.user;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Montant invalide." });
+    }
+
+    user.credits = (user.credits || 0) + amount;
+    await user.save();
+
+    res.json({
+      message: "Crédits ajoutés avec succès.",
+      credits: user.credits
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Erreur serveur." });
   }
 };

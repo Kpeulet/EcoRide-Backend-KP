@@ -5,7 +5,8 @@ import morgan from "morgan";
 import rideRoutes from "./routes/rideRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import vehicleRoutes from "./routes/vehicleRoutes.js"; // ✅ AJOUT
+import vehicleRoutes from "./routes/vehicleRoutes.js";
+import userRoutes from "./routes/userRoutes.js"; // ✅ AJOUT US 8
 
 const app = express();
 
@@ -17,7 +18,8 @@ app.use(morgan("dev"));
 app.use("/api/auth", authRoutes);
 app.use("/api/rides", rideRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/vehicles", vehicleRoutes); // ✅ AJOUT
+app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/users", userRoutes); // ✅ AJOUT US 8
 
 // Middleware 404
 app.use((req, res) => {
