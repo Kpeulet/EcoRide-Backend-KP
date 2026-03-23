@@ -50,20 +50,11 @@ const rideSchema = new mongoose.Schema(
 
     // 🆕 US11 — Validation des passagers après trajet
     passengerValidations: [
-      {
-        passenger: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-          required: true
-        },
-        status: {
-          type: String,
-          enum: ["pending", "ok", "issue"],
-          default: "pending"
-        },
-        comment: String
-      }
-    ]
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }
+]
   },
   {
     timestamps: true
